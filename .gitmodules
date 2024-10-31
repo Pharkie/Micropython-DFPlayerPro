@@ -1,3 +1,0 @@
-[submodule "micropython-dfplayer"]
-	path = micropython-dfplayer
-	url = https://github.com/redoxcode/micropython-dfplayer
