@@ -14,17 +14,15 @@ player = DFPlayerPro(UART_INSTANCE, TX_PIN, RX_PIN)
 # print('Connection Test:', response)
 
 # Set volume to a medium level
-volume_level = 10
+volume_level = 5
 response = player.set_volume(volume_level)
-print(f'Volume set to {volume_level}, Response:', response)
+print(f"Volume set to {volume_level}, Response:", response)
 
 # Set the filename to play
-filename = '/02/001.mp3'
+filename = "/01/004.mp3"
 
 # Play the specific file
 response = player.play_specific_file(filename)
-print(f'Playing file {filename}, Response:', response)
+print(f"Playing file {filename}, Response:", response)
 
-sleep(1) # Wait for the file to finish playing
-
-print('Finished')
+print("Finished")
