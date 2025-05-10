@@ -1,6 +1,6 @@
 # Description: This library is a MicroPython implementation of the
 # DFPlayer Pro MP3 Player module. It is based on the data sheet provided
-# by the manufacturer. 
+# by the manufacturer.
 # The library was tested with an ESP32-C3 Super mini.
 # Author: Adam Knowles
 # Date: 2024-11-01
@@ -8,6 +8,7 @@
 
 from machine import UART, Pin
 from utime import sleep_ms
+
 
 class DFPlayerPro:
     """
@@ -28,7 +29,15 @@ class DFPlayerPro:
         :param tx_pin: The GPIO pin number for UART TX.
         :param rx_pin: The GPIO pin number for UART RX.
         """
-        self.uart = UART(uart_instance, baudrate=self.UART_BAUD_RATE, tx=Pin(tx_pin), rx=Pin(rx_pin), bits=self.UART_BITS, parity=self.UART_PARITY, stop=self.UART_STOP)
+        self.uart = UART(
+            uart_instance,
+            baudrate=self.UART_BAUD_RATE,
+            tx=Pin(tx_pin),
+            rx=Pin(rx_pin),
+            bits=self.UART_BITS,
+            parity=self.UART_PARITY,
+            stop=self.UART_STOP,
+        )
 
     def send_command(self, command):
         """
@@ -37,7 +46,7 @@ class DFPlayerPro:
         :param command: The AT command to send (as a byte string).
         :return: The response from the DFPlayer Pro (as a byte string).
         """
-        self.uart.write(command + b'\r\n')
+        self.uart.write(command + b"\r\n")
         sleep_ms(self.COMMAND_LATENCY)
         response = self.uart.read()
         # print(f"Sent: {command}, Received: {response}")
@@ -187,9 +196,17 @@ class DFPlayerPro:
         """
         Query the file name of the currently playing track.
 
-        :return: The response from the DFPlayer Pro.
+        :return: The file name of the currently playing track (decoded and cleaned).
         """
-        return self.send_command(b"AT+QUERY=5")
+        response = self.send_command(b"AT+QUERY=5")
+        if response:
+            try:
+                # Decode the response from UTF-16 and strip unnecessary parts
+                decoded_response = response.decode("utf-16").strip("OK\r\n")
+                return decoded_response
+            except UnicodeDecodeError:
+                return "Error decoding response"
+        return "No response received"
 
     def play_file_number(self, file_number):
         """
@@ -264,6 +281,7 @@ class DFPlayerPro:
         """
         command = f"AT+LED={state}".encode()
         return self.send_command(command)
+
 
 # Example usage
 # dfplayer = DFPlayerPro(uart_instance=1, tx_pin=21, rx_pin=20)
