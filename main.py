@@ -10,14 +10,14 @@ GPIO2 = 2
 GPIO3 = 3
 
 # Logging levels
-LOG_LEVEL = "INFO"  # Options: "INFO", "WARN", "ERROR"
+LOG_LEVEL = "NONE"  # Options: "NONE", "ERROR", "WARN", "INFO"
 
 
 def log(level, message):
     """
     Log a message if the level is equal to or higher than the current LOG_LEVEL.
     """
-    levels = {"ERROR": 0, "WARN": 1, "INFO": 2}
+    levels = {"NONE": -1, "ERROR": 0, "WARN": 1, "INFO": 2}
     if levels[level] <= levels[LOG_LEVEL]:
         print(f"[{level}] {message}")
 
