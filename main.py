@@ -1,4 +1,4 @@
-from time import sleep
+from time import sleep, ticks_ms, ticks_diff
 from machine import Pin
 from dfplayerpro import DFPlayerPro, UART
 from secretgame import SecretGame
@@ -109,21 +109,21 @@ try:
                     if not frother_pressed:
                         frother_pressed = True
                         if not is_playing or current_file != FILE_FROTHER:
-                            player.set_volume(
-                                DEFAULT_VOLUME
-                            )  # Set volume to 10
-                            response = player.play_specific_file(FILE_FROTHER)
-                            if validate_response(
-                                response,
-                                f"Playing file {FILE_FROTHER}",
-                                f"Failed to play Frother file",
-                            ):
-                                current_file = player.query_file_name()
-                                log(
-                                    "INFO",
-                                    f"Currently playing file: {current_file}",
+                            if player.set_volume(DEFAULT_VOLUME):
+                                response = player.play_specific_file(
+                                    FILE_FROTHER
                                 )
-                                is_playing = True
+                                if validate_response(
+                                    response,
+                                    f"Playing file {FILE_FROTHER}",
+                                    f"Failed to play Frother file",
+                                ):
+                                    current_file = player.query_file_name()
+                                    log(
+                                        "INFO",
+                                        f"Currently playing file: {current_file}",
+                                    )
+                                    is_playing = True
                 else:
                     frother_pressed = False
 
@@ -132,21 +132,21 @@ try:
                     if not espresso_pressed:
                         espresso_pressed = True
                         if not is_playing or current_file != FILE_ESPRESSO:
-                            player.set_volume(
-                                DEFAULT_VOLUME
-                            )  # Set volume to 10
-                            response = player.play_specific_file(FILE_ESPRESSO)
-                            if validate_response(
-                                response,
-                                f"Playing file {FILE_ESPRESSO}",
-                                f"Failed to play Espresso file",
-                            ):
-                                current_file = player.query_file_name()
-                                log(
-                                    "INFO",
-                                    f"Currently playing file: {current_file}",
+                            if player.set_volume(DEFAULT_VOLUME):
+                                response = player.play_specific_file(
+                                    FILE_ESPRESSO
                                 )
-                                is_playing = True
+                                if validate_response(
+                                    response,
+                                    f"Playing file {FILE_ESPRESSO}",
+                                    f"Failed to play Espresso file",
+                                ):
+                                    current_file = player.query_file_name()
+                                    log(
+                                        "INFO",
+                                        f"Currently playing file: {current_file}",
+                                    )
+                                    is_playing = True
                 else:
                     espresso_pressed = False
 
@@ -156,8 +156,8 @@ try:
                 ):  # No button pressed
                     if is_playing:
                         for vol in range(DEFAULT_VOLUME, -1, -3):
-                            player.set_volume(vol)
-                            sleep(0.1)
+                            if player.set_volume(vol):
+                                sleep(0.3)  # Updated sleep to 0.3 seconds
                         response = player.play()
                         if validate_response(
                             response,
@@ -166,8 +166,7 @@ try:
                         ):
                             is_playing = False
                             # Reset volume to default after fade-out
-                            if player:
-                                response = player.set_volume(DEFAULT_VOLUME)
+                            if player.set_volume(DEFAULT_VOLUME):
                                 validate_response(
                                     response,
                                     f"Volume set to {DEFAULT_VOLUME}",
@@ -176,7 +175,7 @@ try:
         else:  # In game mode
             secret_game.handle_game_mode()
 
-        sleep(0.1)
+        sleep(0.3)  # Updated sleep to 0.3 seconds
 except KeyboardInterrupt:
     log("WARN", "KeyboardInterrupt detected, exiting program")
 finally:

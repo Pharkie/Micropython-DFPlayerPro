@@ -59,6 +59,8 @@ class SecretGame:
         self.log = log_func
         self.sequence = []
         self.in_game_mode = False
+        self.left_button_pressed = False
+        self.right_button_pressed = False
 
     def enter_game_mode(self):
         """
@@ -83,29 +85,41 @@ class SecretGame:
 
     def handle_game_mode(self):
         """
-        Handle button presses in game mode.
+        Handle button presses in game mode with debounce logic.
         """
-        if (
-            not self.button_left.value() and not self.button_right.value()
-        ):  # Both buttons pressed
+        left_pressed = not self.button_left.value()
+        right_pressed = not self.button_right.value()
+
+        if left_pressed and right_pressed:  # Both buttons pressed
             self.log("INFO", "Both buttons pressed in game mode")
             self.check_sequence()
             self.exit_game_mode()
-            sleep(0.1)  # Debounce delay
-        elif not self.button_left.value():  # Left button pressed
+            sleep(0.3)  # Debounce delay updated to 0.3 seconds
+        elif (
+            left_pressed and not self.left_button_pressed
+        ):  # Left button pressed
             self.log("INFO", "Left button pressed in game mode")
             self.sequence.append("L")
             self.player.play_specific_file(
                 FOLDER_PREFIX + "BEEP1.MP3"
             )  # Play beep
-            sleep(0.1)  # Debounce delay
-        elif not self.button_right.value():  # Right button pressed
+            self.left_button_pressed = True
+        elif not left_pressed:  # Left button released
+            self.left_button_pressed = False
+
+        if (
+            right_pressed and not self.right_button_pressed
+        ):  # Right button pressed
             self.log("INFO", "Right button pressed in game mode")
             self.sequence.append("R")
             self.player.play_specific_file(
                 FOLDER_PREFIX + "BEEP2.MP3"
             )  # Play boop
-            sleep(0.1)  # Debounce delay
+            self.right_button_pressed = True
+        elif not right_pressed:  # Right button released
+            self.right_button_pressed = False
+
+        sleep(0.05)  # Short debounce delay to avoid rapid toggling
 
     def check_sequence(self):
         """
