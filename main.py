@@ -1,6 +1,7 @@
 from time import sleep
 from machine import Pin
 from dfplayerpro import DFPlayerPro
+from secretgame import SecretGame
 
 # Constants. Change these if DFPlayer is connected to other pins.
 UART_INSTANCE = 1
@@ -10,7 +11,7 @@ GPIO2 = 2
 GPIO3 = 3
 
 # Logging levels
-LOG_LEVEL = "NONE"  # Options: "NONE", "ERROR", "WARN", "INFO"
+LOG_LEVEL = "INFO"  # Options: "NONE", "ERROR", "WARN", "INFO"
 
 
 def log(level, message):
@@ -39,8 +40,11 @@ response = player.set_volume(volume_level)
 log("INFO", f"Volume set to {volume_level}, Response: {response}")
 
 # Set the filenames to play
-file_frother = "/01/002.mp3"  # Frother
-file_espresso = "/01/001.mp3"  # Espresso
+file_frother = "/01/FROTHER.MP3"  # Frother
+file_espresso = "/01/ESPRESSO.MP3"  # Espresso
+
+# Initialize SecretGame
+secret_game = SecretGame(player, button_frother, button_espresso, log)
 
 # Main loop
 is_playing = False
@@ -51,77 +55,89 @@ espresso_pressed = False
 
 try:
     while True:
-        if not button_frother.value():  # Frother button pressed (active low)
-            if not frother_pressed:  # Only act on the first press
-                frother_pressed = True
+        if not secret_game.in_game_mode:  # Not in game mode
+            if (
+                not button_frother.value() and not button_espresso.value()
+            ):  # Both buttons pressed
+                secret_game.enter_game_mode()
+            else:
+                # Existing button logic
+                if not button_frother.value():  # Frother button pressed
+                    if not frother_pressed:
+                        frother_pressed = True
+                        if (
+                            not is_playing
+                            or has_faded_out
+                            or current_file != file_frother
+                        ):
+                            response = player.play_specific_file(file_frother)
+                            log(
+                                "INFO",
+                                f"Playing file {file_frother}, Response: {response}",
+                            )
+                            current_file = player.query_file_name()
+                            log(
+                                "INFO",
+                                f"Currently playing file: {current_file}",
+                            )
+                            player.set_volume(volume_level)
+                            is_playing = True
+                            has_faded_out = False
+                else:
+                    frother_pressed = False
+
+                if not button_espresso.value():  # Espresso button pressed
+                    if not espresso_pressed:
+                        espresso_pressed = True
+                        if (
+                            not is_playing
+                            or has_faded_out
+                            or current_file != file_espresso
+                        ):
+                            response = player.play_specific_file(file_espresso)
+                            log(
+                                "INFO",
+                                f"Playing file {file_espresso}, Response: {response}",
+                            )
+                            current_file = player.query_file_name()
+                            log(
+                                "INFO",
+                                f"Currently playing file: {current_file}",
+                            )
+                            player.set_volume(volume_level)
+                            is_playing = True
+                            has_faded_out = False
+                else:
+                    espresso_pressed = False
+
                 if (
-                    not is_playing
-                    or has_faded_out
-                    or current_file != file_frother
-                ):
-                    response = player.play_specific_file(file_frother)
-                    log(
-                        "INFO",
-                        f"Playing file {file_frother}, Response: {response}",
-                    )
-                    # Query the currently playing file name
-                    current_file = player.query_file_name()
-                    log("INFO", f"Currently playing file: {current_file}")
-                    player.set_volume(
-                        volume_level
-                    )  # Reset volume to original level
-                    is_playing = True
-                    has_faded_out = False
-        else:
-            frother_pressed = False  # Reset when button is released
+                    not frother_pressed and not espresso_pressed
+                ):  # No button pressed
+                    if is_playing:
+                        for vol in range(volume_level, -1, -3):
+                            if (
+                                not button_frother.value()
+                                or not button_espresso.value()
+                            ):
+                                player.set_volume(volume_level)
+                                log(
+                                    "INFO",
+                                    "Button re-pressed, restoring volume",
+                                )
+                                break
+                            player.set_volume(vol)
+                            sleep(0.1)
+                        else:
+                            response = player.play()
+                            log("INFO", "Playback stopped")
+                            is_playing = False
+                            has_faded_out = True
+        else:  # In game mode
+            secret_game.handle_game_mode()
 
-        if not button_espresso.value():  # Espresso button pressed (active low)
-            if not espresso_pressed:  # Only act on the first press
-                espresso_pressed = True
-                if (
-                    not is_playing
-                    or has_faded_out
-                    or current_file != file_espresso
-                ):
-                    response = player.play_specific_file(file_espresso)
-                    log(
-                        "INFO",
-                        f"Playing file {file_espresso}, Response: {response}",
-                    )
-                    # Query the currently playing file name
-                    current_file = player.query_file_name()
-                    log("INFO", f"Currently playing file: {current_file}")
-                    player.set_volume(
-                        volume_level
-                    )  # Reset volume to original level
-                    is_playing = True
-                    has_faded_out = False
-        else:
-            espresso_pressed = False  # Reset when button is released
-
-        if not frother_pressed and not espresso_pressed:  # No button pressed
-            if is_playing:
-                # Button re-press check and fade-out logic
-                for vol in range(
-                    volume_level, -1, -3
-                ):  # Decrease volume in steps of 3
-                    if (
-                        not button_frother.value()
-                        or not button_espresso.value()
-                    ):  # Any button pressed again
-                        player.set_volume(volume_level)  # Restore volume
-                        log("INFO", "Button re-pressed, restoring volume")
-                        break
-                    player.set_volume(vol)
-                    sleep(0.1)  # 100ms delay for each step
-                else:  # No button pressed again during fade-out
-                    response = player.play()
-                    log("INFO", "Playback stopped")
-                    is_playing = False
-                    has_faded_out = True
-
-        sleep(0.1)  # Small delay to debounce
+        sleep(0.1)
+except KeyboardInterrupt:
+    log("WARN", "KeyboardInterrupt detected, exiting program")
 finally:
-    # Ensure the DFPlayer is stopped on exit
     player.send_command(b"AT+STOP")
     log("INFO", "Program exited, playback stopped.")
