@@ -1,42 +1,45 @@
 from time import sleep
 import random
 
+# Folder prefix for all file paths
+FOLDER_PREFIX = "/02/"
+
 STARTUP_SOUNDS = [
-    "ST-DUN.MP3",
-    "ST-HORN.MP3",
-    "ST-MARIO.MP3",
-    "ST-WEAK.MP3",
+    FOLDER_PREFIX + "ST-DUN.MP3",
+    FOLDER_PREFIX + "ST-HORN.MP3",
+    FOLDER_PREFIX + "ST-MARIO.MP3",
+    FOLDER_PREFIX + "ST-WEAK.MP3",
 ]
 
 FAIL_SOUNDS = [
-    "NO-AWW.MP3",
-    "NO-BRASS.MP3",
-    "NO-BUZZ.MP3",
-    "NO-MARIO.MP3",
-    "NO-NOPE.MP3",
-    "NO-WEAK.MP3",
+    FOLDER_PREFIX + "NO-AWW.MP3",
+    FOLDER_PREFIX + "NO-BRASS.MP3",
+    FOLDER_PREFIX + "NO-BUZZ.MP3",
+    FOLDER_PREFIX + "NO-MARIO.MP3",
+    FOLDER_PREFIX + "NO-NOPE.MP3",
+    FOLDER_PREFIX + "NO-WEAK.MP3",
 ]
 
 MYSTERY_SOUNDS = {
-    "LRLL": "TM-ALLO.MP3",
-    "RR": "TM-ATEAM.MP3",
-    "LLR": "TM-CHRS.MP3",
-    "RRL": "TM-DRWHO.MP3",
-    "LRR": "TM-HAWAI.MP3",
-    "RLL": "TM-HIGN.MP3",
-    "LL": "TM-KNIG.MP3",
-    "RL": "TM-NEIGH.MP3",
-    "LR": "TM-NEV.MP3",
-    "RRLL": "TM-POSTP.MP3",
-    "LLRR": "TM-PRLD.MP3",
-    "LRLR": "TM-QUAN.MP3",
-    "RLRL": "TM-ROLR.MP3",
-    "LRRL": "TM-SPID.MP3",
-    "RLLR": "TM-STAR.MP3",
-    "RRLR": "TM-STARW.MP3",
-    "LLRL": "TM-THOM.MP3",
-    "RLRR": "TM-TOPG.MP3",
-    "LRLRL": "TM-XFIL.MP3",
+    "L": FOLDER_PREFIX + "TM-ALLO.MP3",
+    "R": FOLDER_PREFIX + "TM-ATEAM.MP3",
+    "LL": FOLDER_PREFIX + "TM-CHRS.MP3",
+    "RR": FOLDER_PREFIX + "TM-DRWHO.MP3",
+    "LR": FOLDER_PREFIX + "TM-HAWAI.MP3",
+    "RL": FOLDER_PREFIX + "TM-HIGN.MP3",
+    "LLL": FOLDER_PREFIX + "TM-KNIG.MP3",
+    "RRR": FOLDER_PREFIX + "TM-NEIGH.MP3",
+    "LRL": FOLDER_PREFIX + "TM-NEV.MP3",
+    "RLR": FOLDER_PREFIX + "TM-POSTP.MP3",
+    "LLLR": FOLDER_PREFIX + "TM-PRLD.MP3",
+    "RRRL": FOLDER_PREFIX + "TM-QUAN.MP3",
+    "LRLR": FOLDER_PREFIX + "TM-ROLR.MP3",
+    "RLRL": FOLDER_PREFIX + "TM-SPID.MP3",
+    "LRRL": FOLDER_PREFIX + "TM-STAR.MP3",
+    "RLLR": FOLDER_PREFIX + "TM-STARW.MP3",
+    "LLRL": FOLDER_PREFIX + "TM-THOM.MP3",
+    "RLRR": FOLDER_PREFIX + "TM-TOPG.MP3",
+    "LRLRL": FOLDER_PREFIX + "TM-XFIL.MP3",
 }
 
 
@@ -61,14 +64,22 @@ class SecretGame:
         """
         Enter game mode when both buttons are pressed simultaneously.
         """
-        self.log("INFO", "Entering game mode, advanced")
+        self.log("INFO", "Entering game mode")
+
         startup_sound = random.choice(STARTUP_SOUNDS)
         self.player.play_specific_file(
             startup_sound
         )  # Play random startup sound
         self.sequence = []
         self.in_game_mode = True
-        sleep(1)  # Debounce delay
+        sleep(0.2)  # Debounce delay
+
+    def exit_game_mode(self):
+        """
+        Exit game mode when both buttons are pressed again.
+        """
+        self.log("INFO", "Exiting game mode")
+        self.in_game_mode = False
 
     def handle_game_mode(self):
         """
@@ -79,18 +90,22 @@ class SecretGame:
         ):  # Both buttons pressed
             self.log("INFO", "Both buttons pressed in game mode")
             self.check_sequence()
-            self.in_game_mode = False
-            sleep(1)  # Debounce delay
+            self.exit_game_mode()
+            sleep(0.1)  # Debounce delay
         elif not self.button_left.value():  # Left button pressed
             self.log("INFO", "Left button pressed in game mode")
             self.sequence.append("L")
-            self.player.play_specific_file("02/002.mp3")  # Play beep
-            sleep(0.5)  # Debounce delay
+            self.player.play_specific_file(
+                FOLDER_PREFIX + "BEEP1.MP3"
+            )  # Play beep
+            sleep(0.1)  # Debounce delay
         elif not self.button_right.value():  # Right button pressed
             self.log("INFO", "Right button pressed in game mode")
             self.sequence.append("R")
-            self.player.play_specific_file("02/003.mp3")  # Play boop
-            sleep(0.5)  # Debounce delay
+            self.player.play_specific_file(
+                FOLDER_PREFIX + "BEEP2.MP3"
+            )  # Play boop
+            sleep(0.1)  # Debounce delay
 
     def check_sequence(self):
         """
