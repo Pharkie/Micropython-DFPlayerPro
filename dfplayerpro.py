@@ -1,4 +1,4 @@
-from time import ticks_ms, ticks_diff
+from time import ticks_ms, ticks_diff, sleep
 from machine import UART
 
 
@@ -33,14 +33,16 @@ class DFPlayerPro:
 
     def send_command(self, command):
         """
-        Send a command to the DFPlayer.
+        Send a command to the DFPlayer and wait for a response.
 
         :param command: The command to send as bytes.
-        :return: True if the command was sent successfully.
+        :return: The response from the DFPlayer, or None if no response is received.
         """
         self.uart.write(command)
         self._log("DEBUG", f"Command sent: {command}")
-        return True  # Indicate that the command was sent successfully
+        response = self.wait_for_response()  # Wait for and return the response
+        sleep(0.1)  # Small delay to allow for processing
+        return response
 
     def wait_for_response(self):
         """
@@ -65,27 +67,23 @@ class DFPlayerPro:
 
     def play_specific_file(self, file_path):
         """
-        Play a specific file and wait for a response.
+        Play a specific file.
 
         :param file_path: The file path to play as a string.
         :return: The response from the DFPlayer, or None if the command was not sent.
         """
         command = f"AT+PLAYFILE={file_path}\r\n".encode()
-        if self.send_command(command):
-            return self.wait_for_response()
-        return None
+        return self.send_command(command)
 
     def set_volume(self, volume):
         """
-        Set the volume and wait for a response.
+        Set the volume.
 
         :param volume: The volume level (0-30).
         :return: The response from the DFPlayer, or None if the command was not sent.
         """
         command = f"AT+VOL={volume}\r\n".encode()
-        if self.send_command(command):
-            return self.wait_for_response()  # Return the actual response
-        return None
+        return self.send_command(command)
 
     def test_connection(self):
         """
@@ -93,42 +91,42 @@ class DFPlayerPro:
 
         :return: The response from the DFPlayer, or None if no response is received.
         """
-        if self.send_command(b"AT\r\n"):
-            return self.wait_for_response()  # Wait for and return the response
-        return None
+        return self.send_command(b"AT\r\n")
 
     def set_prompt_tone(self, state):
         """
-        Enable or disable the prompt tone and wait for a response.
+        Enable or disable the prompt tone.
 
         :param state: "ON" or "OFF".
         :return: The response from the DFPlayer, or None if the command was not sent.
         """
         command = f"AT+PROMPT={state}\r\n".encode()
-        if self.send_command(command):
-            return self.wait_for_response()
-        return None
+        return self.send_command(command)
 
     def query_file_name(self):
         """
-        Query the currently playing file name and wait for a response.
+        Query the currently playing file name.
 
         :return: The file name as a decoded string, or None if the command was not sent or the response is invalid.
         """
-        if self.send_command(b"AT+QUERY=5\r\n"):  # Query file name
-            response = self.wait_for_response()
-            if response and b"\r\n" in response:  # Validate the response format
-                try:
-                    decoded_name = response.strip().decode("utf-16")
-                    self._log("INFO", f"Queried file name: {decoded_name}")
-                    return decoded_name
-                except UnicodeDecodeError:
-                    self._log("WARN", f"Failed to decode file name: {response}")
-            else:
-                self._log(
-                    "WARN", f"Invalid response for query_file_name: {response}"
+        response = self.send_command(b"AT+QUERY=5\r\n")  # Query file name
+        if response and b"\r\n" in response:  # Validate the response format
+            try:
+                decoded_name = response.strip().decode(
+                    "utf-16", errors="ignore"
                 )
-        return None  # Return None if the command was not sent or the response is invalid
+                self._log("INFO", f"Queried file name: {decoded_name}")
+                return decoded_name
+            except Exception as e:
+                self._log(
+                    "WARN",
+                    f"Failed to decode file name: {response}, Error: {e}",
+                )
+        else:
+            self._log(
+                "WARN", f"Invalid response for query_file_name: {response}"
+            )
+        return None
 
     def play_next(self):
         """

@@ -4,43 +4,55 @@ import random
 # Folder prefix for all file paths
 FOLDER_PREFIX = "/02/"
 
-STARTUP_SOUNDS = [
-    FOLDER_PREFIX + "ST-DUN.MP3",
-    FOLDER_PREFIX + "ST-HORN.MP3",
-    FOLDER_PREFIX + "ST-MARIO.MP3",
-    FOLDER_PREFIX + "ST-WEAK.MP3",
-]
+# Debounce delay for button presses
+DEBOUNCE_DELAY = 0.3  # 0.3 seconds
 
-FAIL_SOUNDS = [
-    FOLDER_PREFIX + "NO-AWW.MP3",
-    FOLDER_PREFIX + "NO-BRASS.MP3",
-    FOLDER_PREFIX + "NO-BUZZ.MP3",
-    FOLDER_PREFIX + "NO-MARIO.MP3",
-    FOLDER_PREFIX + "NO-NOPE.MP3",
-    FOLDER_PREFIX + "NO-WEAK.MP3",
-]
+# Fixed startup and fail sounds
+STARTUP_SOUND = "ST-MARIO.MP3"
+FAIL_SOUND = "NO-MARIO.MP3"
+
+# Mystery game volume
+GAME_VOLUME = 5  # Max 30
 
 MYSTERY_SOUNDS = {
-    "L": FOLDER_PREFIX + "TM-ALLO.MP3",
-    "R": FOLDER_PREFIX + "TM-ATEAM.MP3",
-    "LL": FOLDER_PREFIX + "TM-CHRS.MP3",
-    "RR": FOLDER_PREFIX + "TM-DRWHO.MP3",
-    "LR": FOLDER_PREFIX + "TM-HAWAI.MP3",
-    "RL": FOLDER_PREFIX + "TM-HIGN.MP3",
-    "LLL": FOLDER_PREFIX + "TM-KNIG.MP3",
-    "RRR": FOLDER_PREFIX + "TM-NEIGH.MP3",
-    "LRL": FOLDER_PREFIX + "TM-NEV.MP3",
-    "RLR": FOLDER_PREFIX + "TM-POSTP.MP3",
-    "LLLR": FOLDER_PREFIX + "TM-PRLD.MP3",
-    "RRRL": FOLDER_PREFIX + "TM-QUAN.MP3",
-    "LRLR": FOLDER_PREFIX + "TM-ROLR.MP3",
-    "RLRL": FOLDER_PREFIX + "TM-SPID.MP3",
-    "LRRL": FOLDER_PREFIX + "TM-STAR.MP3",
-    "RLLR": FOLDER_PREFIX + "TM-STARW.MP3",
-    "LLRL": FOLDER_PREFIX + "TM-THOM.MP3",
-    "RLRR": FOLDER_PREFIX + "TM-TOPG.MP3",
-    "LRLRL": FOLDER_PREFIX + "TM-XFIL.MP3",
+    # 1-character patterns (2 sounds)
+    "L": "TM-SOOTY.MP3",
+    "R": "TM-SHARK.MP3",
+    # 2-character patterns (4 sounds)
+    "LL": "TM-PEPPA.MP3",
+    "RR": "TM-SESAM.MP3",
+    "LR": "TM-FIREM.MP3",
+    "RL": "TM-BLUEY.MP3",
+    # 3-character patterns (8 sounds)
+    "LLL": "TM-WHEEL.MP3",
+    "LLR": "TM-MCDON.MP3",
+    "LRL": "TM-MARIO.MP3",
+    "LRR": "TM-THOM.MP3",
+    "RLL": "TM-PAWP.MP3",
+    "RLR": "TM-DRWHO.MP3",
+    "RRL": "TM-ROLR.MP3",
+    "RRR": "TM-SPID.MP3",
+    # 4-character patterns (16 sounds)
+    "LLLL": "TM-PRLD.MP3",
+    "LLLR": "TM-HIGN.MP3",
+    "LLRL": "TM-XFIL.MP3",
+    "LLRR": "TM-TBIRD.MP3",
+    "LRLL": "TM-QUAN.MP3",
+    "LRLR": "TM-ALLO.MP3",
+    "LRRL": "TM-STAR.MP3",
+    "LRRR": "TM-KNIG.MP3",
+    "RLLL": "TM-STARW.MP3",
+    "RLLR": "TM-TOPG.MP3",
+    "RLRL": "TM-CHRS.MP3",
+    "RLRR": "TM-POSTP.MP3",
+    "RRLL": "TM-HAWAI.MP3",
+    "RRLR": "TM-BLUEY.MP3",
+    "RRRL": "TM-NEV.MP3",
+    "RRRR": "TM-NEIGH.MP3",
 }
+
+# Maximum valid sequence length
+MAX_SEQUENCE_LENGTH = max(len(seq) for seq in MYSTERY_SOUNDS.keys())
 
 
 class SecretGame:
@@ -58,11 +70,7 @@ class SecretGame:
         self.button_right = button_right
         self.log = log_func
         self.sequence = []
-        self.target_sequence = ["R", "L"]  # Example target sequence
-        self.sequence_matched = False  # Track if the sequence is matched
         self.in_game_mode = False
-        self.left_button_pressed = False
-        self.right_button_pressed = False
 
     def enter_game_mode(self):
         """
@@ -70,60 +78,66 @@ class SecretGame:
         """
         self.log("INFO", "Entering game mode")
 
-        startup_sound = random.choice(STARTUP_SOUNDS)
         self.player.play_specific_file(
-            startup_sound
-        )  # Play random startup sound
+            FOLDER_PREFIX + STARTUP_SOUND
+        )  # Play startup sound
+        self.player.set_volume(GAME_VOLUME)
         self.sequence = []
         self.in_game_mode = True
-        sleep(0.2)  # Debounce delay
+        sleep(DEBOUNCE_DELAY)
 
     def exit_game_mode(self):
         """
         Exit game mode when both buttons are pressed again.
         """
-        self.sequence = []  # Reset the sequence
-        self.sequence_matched = False  # Reset the matched flag
         self.log("INFO", "Exiting game mode")
         self.in_game_mode = False
 
+    def exit_game_with_fail(self, reason, sequence_str=""):
+        """
+        Exit the game mode and play the fail sound with a log message.
+
+        :param reason: The reason for exiting the game mode.
+        :param sequence_str: The sequence that caused the failure (optional).
+        """
+        self.log("INFO", f"Exiting game mode due to: {reason}")
+        if sequence_str:
+            self.log("INFO", f"Sequence that failed: {sequence_str}")
+        self.player.play_specific_file(
+            FOLDER_PREFIX + FAIL_SOUND
+        )  # Play fail sound
+        self.exit_game_mode()
+
     def handle_game_mode(self):
         """
-        Handle button presses in game mode with debounce logic.
+        Handle button presses in game mode.
         """
-        left_pressed = not self.button_left.value()
-        right_pressed = not self.button_right.value()
-
-        if left_pressed and right_pressed:  # Both buttons pressed
+        if (
+            not self.button_left.value() and not self.button_right.value()
+        ):  # Both buttons pressed
             self.log("INFO", "Both buttons pressed in game mode")
             self.check_sequence()
-            self.exit_game_mode()
-            sleep(0.3)  # Debounce delay updated to 0.3 seconds
-        elif (
-            left_pressed and not self.left_button_pressed
-        ):  # Left button pressed
+            sleep(DEBOUNCE_DELAY)
+        elif not self.button_left.value():
             self.log("INFO", "Left button pressed in game mode")
             self.sequence.append("L")
             self.player.play_specific_file(
                 FOLDER_PREFIX + "BEEP1.MP3"
             )  # Play beep
-            self.left_button_pressed = True
-        elif not left_pressed:  # Left button released
-            self.left_button_pressed = False
-
-        if (
-            right_pressed and not self.right_button_pressed
-        ):  # Right button pressed
+            sleep(DEBOUNCE_DELAY)
+        elif not self.button_right.value():
             self.log("INFO", "Right button pressed in game mode")
             self.sequence.append("R")
             self.player.play_specific_file(
                 FOLDER_PREFIX + "BEEP2.MP3"
             )  # Play boop
-            self.right_button_pressed = True
-        elif not right_pressed:  # Right button released
-            self.right_button_pressed = False
+            sleep(DEBOUNCE_DELAY)
 
-        sleep(0.05)  # Short debounce delay to avoid rapid toggling
+        # Check if the sequence exceeds the maximum valid length
+        if len(self.sequence) > MAX_SEQUENCE_LENGTH:
+            self.exit_game_with_fail(
+                "Sequence exceeded maximum length", "".join(self.sequence)
+            )
 
     def check_sequence(self):
         """
@@ -132,34 +146,12 @@ class SecretGame:
         sequence_str = "".join(self.sequence)
         self.log("INFO", f"Checking sequence: {sequence_str}")
         if sequence_str in MYSTERY_SOUNDS:
-            matched_file = MYSTERY_SOUNDS[sequence_str]
+            matched_file = FOLDER_PREFIX + MYSTERY_SOUNDS[sequence_str]
             self.log(
                 "INFO",
                 f"Sequence matched: {sequence_str}, playing {matched_file}",
             )
             self.player.play_specific_file(matched_file)  # Play success sound
-            self.sequence_matched = True
+            self.exit_game_mode()
         else:
-            self.log("WARN", f"Sequence not matched: {sequence_str}")
-            fail_sound = random.choice(FAIL_SOUNDS)
-            self.player.play_specific_file(fail_sound)  # Play random fail sound
-            self.sequence = []  # Reset the sequence
-
-    def handle_matched_sequence(self):
-        """
-        Handle the logic for a matched sequence by playing the corresponding file.
-        """
-        sequence_str = "".join(self.sequence)
-        if sequence_str in MYSTERY_SOUNDS:
-            matched_file = MYSTERY_SOUNDS[sequence_str]
-            self.log(
-                "INFO",
-                f"Sequence matched: {sequence_str}, playing {matched_file}",
-            )
-            response = self.player.play_specific_file(matched_file)
-            if response:
-                self.log("INFO", f"Played matched file: {matched_file}")
-            else:
-                self.log("WARN", f"Failed to play matched file: {matched_file}")
-        else:
-            self.log("WARN", f"No matched file for sequence: {sequence_str}")
+            self.exit_game_with_fail("Sequence not matched", sequence_str)

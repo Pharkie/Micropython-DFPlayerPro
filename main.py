@@ -1,4 +1,4 @@
-from time import sleep, ticks_ms, ticks_diff
+from time import sleep
 from machine import Pin
 from dfplayerpro import DFPlayerPro, UART
 from secretgame import SecretGame
@@ -10,11 +10,14 @@ RX_PIN = 6
 GPIO_FROTHER = 3
 GPIO_ESPRESSO = 2
 
-# Default volume for all sounds
-DEFAULT_VOLUME = 10  # Max 30
+# Default volume
+DEFAULT_VOLUME = 8  # Max 30
+
+# Debounce delay for button presses
+DEBOUNCE_DELAY = 0.3  # 0.3 seconds
 
 # Logging levels
-LOG_LEVEL = "INFO"  # Options: "NONE", "ERROR", "WARN", "INFO", "DEBUG"
+LOG_LEVEL = "DEBUG"  # Options: "NONE", "ERROR", "WARN", "INFO", "DEBUG"
 
 
 def log(level, message):
@@ -26,9 +29,6 @@ def log(level, message):
         print(f"[{level}] {message}")
 
 
-log("INFO", "Starting up...")
-
-
 def validate_response(response, success_message, failure_message):
     """
     Validate the response from the DFPlayer and log the appropriate message.
@@ -38,10 +38,7 @@ def validate_response(response, success_message, failure_message):
     :param failure_message: The message to log if the response is invalid.
     :return: True if the response is valid, False otherwise.
     """
-    if response is None:
-        log("WARN", f"{failure_message}: No response received")
-        return False
-    if isinstance(response, bytes) and b"OK" in response:
+    if response and b"OK" in response:
         log("INFO", success_message)
         return True
     else:
@@ -49,16 +46,17 @@ def validate_response(response, success_message, failure_message):
         return False
 
 
+log("INFO", "Starting up...")
+
 # Create player instance with error handling
 try:
-    player = DFPlayerPro(
-        UART_INSTANCE, TX_PIN, RX_PIN, log_level=LOG_LEVEL
-    )  # Pass log level
+    player = DFPlayerPro(UART_INSTANCE, TX_PIN, RX_PIN)
     response = player.test_connection()
-    if response:
-        log("INFO", f"DFPlayer connected successfully: {response}")
-    else:
-        log("WARN", "DFPlayer not responding or invalid response")
+    if not validate_response(
+        response,
+        "DFPlayer connected successfully",
+        "DFPlayer not responding or invalid response",
+    ):
         player = None  # Set player to None to handle gracefully later
 except Exception as e:
     log("ERROR", f"Failed to initialize DFPlayer: {e}")
@@ -67,9 +65,6 @@ except Exception as e:
 # Disable the prompt tone to stop "music" on startup
 if player:
     response = player.set_prompt_tone("OFF")
-    log(
-        "DEBUG", f"Raw response for prompt tone: {response}"
-    )  # Log raw response
     validate_response(
         response, "Prompt tone disabled", "Failed to disable prompt tone"
     )
@@ -81,7 +76,6 @@ button_espresso = Pin(GPIO_ESPRESSO, Pin.IN, Pin.PULL_UP)
 # Set volume globally
 if player:
     response = player.set_volume(DEFAULT_VOLUME)
-    log("DEBUG", f"Raw response for volume: {response}")  # Log raw response
     validate_response(
         response, f"Volume set to {DEFAULT_VOLUME}", "Failed to set volume"
     )
@@ -110,49 +104,43 @@ try:
             if (
                 not button_frother.value() and not button_espresso.value()
             ):  # Both buttons pressed
-                response = player.set_volume(
-                    DEFAULT_VOLUME
-                )  # Reset volume to default
-                validate_response(
-                    response,
-                    f"Volume set to {DEFAULT_VOLUME} for game mode",
-                    "Failed to set volume for game mode",
-                )
                 secret_game.enter_game_mode()
             else:
-                # Frother button logic
+                # Frother button logic with logging
                 if not button_frother.value():  # Frother button pressed
                     if not frother_pressed:
                         frother_pressed = True
-                        if not is_playing or current_file != FILE_FROTHER:
-                            if player.set_volume(DEFAULT_VOLUME):
-                                response = player.play_specific_file(
-                                    FILE_FROTHER
+                        sleep(DEBOUNCE_DELAY)  # Use debounce delay
+                        if not button_frother.value():  # Confirm stable press
+                            if not is_playing or current_file != FILE_FROTHER:
+                                log(
+                                    "INFO",
+                                    f"Playing frother file: {FILE_FROTHER}",
                                 )
-                                if validate_response(
-                                    response,
-                                    f"Playing file {FILE_FROTHER}",
-                                    f"Failed to play Frother file",
-                                ):
-                                    is_playing = True
+                                player.play_specific_file(FILE_FROTHER)
+                                player.set_volume(
+                                    DEFAULT_VOLUME
+                                )  # Set volume to 10
+                                is_playing = True
                 else:
                     frother_pressed = False
 
-                # Espresso button logic
+                # Espresso button logic with logging
                 if not button_espresso.value():  # Espresso button pressed
                     if not espresso_pressed:
                         espresso_pressed = True
-                        if not is_playing or current_file != FILE_ESPRESSO:
-                            if player.set_volume(DEFAULT_VOLUME):
-                                response = player.play_specific_file(
-                                    FILE_ESPRESSO
+                        sleep(DEBOUNCE_DELAY)  # Use debounce delay
+                        if not button_espresso.value():  # Confirm stable press
+                            if not is_playing or current_file != FILE_ESPRESSO:
+                                log(
+                                    "INFO",
+                                    f"Playing espresso file: {FILE_ESPRESSO}",
                                 )
-                                if validate_response(
-                                    response,
-                                    f"Playing file {FILE_ESPRESSO}",
-                                    f"Failed to play Espresso file",
-                                ):
-                                    is_playing = True
+                                player.play_specific_file(FILE_ESPRESSO)
+                                player.set_volume(
+                                    DEFAULT_VOLUME
+                                )  # Set volume to 10
+                                is_playing = True
                 else:
                     espresso_pressed = False
 
@@ -161,36 +149,13 @@ try:
                     not frother_pressed and not espresso_pressed
                 ):  # No button pressed
                     if is_playing:
-                        for vol in range(
-                            DEFAULT_VOLUME, -1, -2
-                        ):  # Ensure 0 is included
-                            if (
-                                vol < 0
-                            ):  # Clamp the volume to 0 if it goes negative
-                                vol = 0
+                        for vol in range(DEFAULT_VOLUME, -1, -2):
                             response = player.set_volume(vol)
-                            if response:
-                                sleep(0.3)
-                                log(
-                                    "DEBUG",
-                                    f"Volume faded to {vol}",
-                                )
+                        player.set_volume(0)  # Mute, just to be sure
                         is_playing = False  # Mark playback as stopped
         else:  # In game mode
-            # Handle game mode logic
             secret_game.handle_game_mode()
 
-            # Check if the sequence is matched and let SecretGame handle it
-            if secret_game.sequence_matched:
-                secret_game.handle_matched_sequence()
-
-                # Exit game mode after handling the matched sequence
-                secret_game.exit_game_mode()
-
-                # Reset button states to prevent immediate re-entry
-                frother_pressed = False
-                espresso_pressed = False
-
-        sleep(0.3)
+        sleep(0.1)
 except KeyboardInterrupt:
     log("WARN", "KeyboardInterrupt detected, exiting program")
