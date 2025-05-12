@@ -14,7 +14,7 @@ GPIO_ESPRESSO = 2
 DEFAULT_VOLUME = 10  # Max 30
 
 # Logging levels
-LOG_LEVEL = "DEBUG"  # Options: "NONE", "ERROR", "WARN", "INFO", "DEBUG"
+LOG_LEVEL = "INFO"  # Options: "NONE", "ERROR", "WARN", "INFO", "DEBUG"
 
 
 def log(level, message):
@@ -110,12 +110,14 @@ try:
             if (
                 not button_frother.value() and not button_espresso.value()
             ):  # Both buttons pressed
-                if player.set_volume(DEFAULT_VOLUME):  # Reset volume to default
-                    validate_response(
-                        None,
-                        f"Volume set to {DEFAULT_VOLUME} for game mode",
-                        "Failed to set volume for game mode",
-                    )
+                response = player.set_volume(
+                    DEFAULT_VOLUME
+                )  # Reset volume to default
+                validate_response(
+                    response,
+                    f"Volume set to {DEFAULT_VOLUME} for game mode",
+                    "Failed to set volume for game mode",
+                )
                 secret_game.enter_game_mode()
             else:
                 # Frother button logic
@@ -166,7 +168,8 @@ try:
                                 vol < 0
                             ):  # Clamp the volume to 0 if it goes negative
                                 vol = 0
-                            if player.set_volume(vol):
+                            response = player.set_volume(vol)
+                            if response:
                                 sleep(0.3)
                                 log(
                                     "DEBUG",
@@ -174,7 +177,19 @@ try:
                                 )
                         is_playing = False  # Mark playback as stopped
         else:  # In game mode
+            # Handle game mode logic
             secret_game.handle_game_mode()
+
+            # Check if the sequence is matched and let SecretGame handle it
+            if secret_game.sequence_matched:
+                secret_game.handle_matched_sequence()
+
+                # Exit game mode after handling the matched sequence
+                secret_game.exit_game_mode()
+
+                # Reset button states to prevent immediate re-entry
+                frother_pressed = False
+                espresso_pressed = False
 
         sleep(0.3)
 except KeyboardInterrupt:

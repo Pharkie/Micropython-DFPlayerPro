@@ -58,6 +58,8 @@ class SecretGame:
         self.button_right = button_right
         self.log = log_func
         self.sequence = []
+        self.target_sequence = ["R", "L"]  # Example target sequence
+        self.sequence_matched = False  # Track if the sequence is matched
         self.in_game_mode = False
         self.left_button_pressed = False
         self.right_button_pressed = False
@@ -80,6 +82,8 @@ class SecretGame:
         """
         Exit game mode when both buttons are pressed again.
         """
+        self.sequence = []  # Reset the sequence
+        self.sequence_matched = False  # Reset the matched flag
         self.log("INFO", "Exiting game mode")
         self.in_game_mode = False
 
@@ -128,11 +132,34 @@ class SecretGame:
         sequence_str = "".join(self.sequence)
         self.log("INFO", f"Checking sequence: {sequence_str}")
         if sequence_str in MYSTERY_SOUNDS:
-            self.log("INFO", f"Sequence matched: {sequence_str}")
-            self.player.play_specific_file(
-                MYSTERY_SOUNDS[sequence_str]
-            )  # Play success sound
+            matched_file = MYSTERY_SOUNDS[sequence_str]
+            self.log(
+                "INFO",
+                f"Sequence matched: {sequence_str}, playing {matched_file}",
+            )
+            self.player.play_specific_file(matched_file)  # Play success sound
+            self.sequence_matched = True
         else:
             self.log("WARN", f"Sequence not matched: {sequence_str}")
             fail_sound = random.choice(FAIL_SOUNDS)
             self.player.play_specific_file(fail_sound)  # Play random fail sound
+            self.sequence = []  # Reset the sequence
+
+    def handle_matched_sequence(self):
+        """
+        Handle the logic for a matched sequence by playing the corresponding file.
+        """
+        sequence_str = "".join(self.sequence)
+        if sequence_str in MYSTERY_SOUNDS:
+            matched_file = MYSTERY_SOUNDS[sequence_str]
+            self.log(
+                "INFO",
+                f"Sequence matched: {sequence_str}, playing {matched_file}",
+            )
+            response = self.player.play_specific_file(matched_file)
+            if response:
+                self.log("INFO", f"Played matched file: {matched_file}")
+            else:
+                self.log("WARN", f"Failed to play matched file: {matched_file}")
+        else:
+            self.log("WARN", f"No matched file for sequence: {sequence_str}")

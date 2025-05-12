@@ -84,7 +84,7 @@ class DFPlayerPro:
         """
         command = f"AT+VOL={volume}\r\n".encode()
         if self.send_command(command):
-            return self.wait_for_response()
+            return self.wait_for_response()  # Return the actual response
         return None
 
     def test_connection(self):
