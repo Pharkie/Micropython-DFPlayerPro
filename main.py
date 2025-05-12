@@ -14,14 +14,14 @@ GPIO_ESPRESSO = 2
 DEFAULT_VOLUME = 10  # Max 30
 
 # Logging levels
-LOG_LEVEL = "INFO"  # Options: "NONE", "ERROR", "WARN", "INFO"
+LOG_LEVEL = "DEBUG"  # Options: "NONE", "ERROR", "WARN", "INFO", "DEBUG"
 
 
 def log(level, message):
     """
     Log a message if the level is equal to or higher than the current LOG_LEVEL.
     """
-    levels = {"NONE": -1, "ERROR": 0, "WARN": 1, "INFO": 2}
+    levels = {"NONE": -1, "ERROR": 0, "WARN": 1, "INFO": 2, "DEBUG": 3}
     if levels[level] <= levels[LOG_LEVEL]:
         print(f"[{level}] {message}")
 
@@ -38,7 +38,10 @@ def validate_response(response, success_message, failure_message):
     :param failure_message: The message to log if the response is invalid.
     :return: True if the response is valid, False otherwise.
     """
-    if response and b"OK" in response:
+    if response is None:
+        log("WARN", f"{failure_message}: No response received")
+        return False
+    if isinstance(response, bytes) and b"OK" in response:
         log("INFO", success_message)
         return True
     else:
@@ -48,13 +51,14 @@ def validate_response(response, success_message, failure_message):
 
 # Create player instance with error handling
 try:
-    player = DFPlayerPro(UART_INSTANCE, TX_PIN, RX_PIN)
+    player = DFPlayerPro(
+        UART_INSTANCE, TX_PIN, RX_PIN, log_level=LOG_LEVEL
+    )  # Pass log level
     response = player.test_connection()
-    if not validate_response(
-        response,
-        "DFPlayer connected successfully",
-        "DFPlayer not responding or invalid response",
-    ):
+    if response:
+        log("INFO", f"DFPlayer connected successfully: {response}")
+    else:
+        log("WARN", "DFPlayer not responding or invalid response")
         player = None  # Set player to None to handle gracefully later
 except Exception as e:
     log("ERROR", f"Failed to initialize DFPlayer: {e}")
@@ -63,6 +67,9 @@ except Exception as e:
 # Disable the prompt tone to stop "music" on startup
 if player:
     response = player.set_prompt_tone("OFF")
+    log(
+        "DEBUG", f"Raw response for prompt tone: {response}"
+    )  # Log raw response
     validate_response(
         response, "Prompt tone disabled", "Failed to disable prompt tone"
     )
@@ -74,6 +81,7 @@ button_espresso = Pin(GPIO_ESPRESSO, Pin.IN, Pin.PULL_UP)
 # Set volume globally
 if player:
     response = player.set_volume(DEFAULT_VOLUME)
+    log("DEBUG", f"Raw response for volume: {response}")  # Log raw response
     validate_response(
         response, f"Volume set to {DEFAULT_VOLUME}", "Failed to set volume"
     )
@@ -102,6 +110,12 @@ try:
             if (
                 not button_frother.value() and not button_espresso.value()
             ):  # Both buttons pressed
+                if player.set_volume(DEFAULT_VOLUME):  # Reset volume to default
+                    validate_response(
+                        None,
+                        f"Volume set to {DEFAULT_VOLUME} for game mode",
+                        "Failed to set volume for game mode",
+                    )
                 secret_game.enter_game_mode()
             else:
                 # Frother button logic
@@ -118,11 +132,6 @@ try:
                                     f"Playing file {FILE_FROTHER}",
                                     f"Failed to play Frother file",
                                 ):
-                                    current_file = player.query_file_name()
-                                    log(
-                                        "INFO",
-                                        f"Currently playing file: {current_file}",
-                                    )
                                     is_playing = True
                 else:
                     frother_pressed = False
@@ -141,11 +150,6 @@ try:
                                     f"Playing file {FILE_ESPRESSO}",
                                     f"Failed to play Espresso file",
                                 ):
-                                    current_file = player.query_file_name()
-                                    log(
-                                        "INFO",
-                                        f"Currently playing file: {current_file}",
-                                    )
                                     is_playing = True
                 else:
                     espresso_pressed = False
@@ -155,34 +159,23 @@ try:
                     not frother_pressed and not espresso_pressed
                 ):  # No button pressed
                     if is_playing:
-                        for vol in range(DEFAULT_VOLUME, -1, -3):
+                        for vol in range(
+                            DEFAULT_VOLUME, -1, -2
+                        ):  # Ensure 0 is included
+                            if (
+                                vol < 0
+                            ):  # Clamp the volume to 0 if it goes negative
+                                vol = 0
                             if player.set_volume(vol):
-                                sleep(0.3)  # Updated sleep to 0.3 seconds
-                        response = player.play()
-                        if validate_response(
-                            response,
-                            "Playback stopped",
-                            "Failed to stop playback",
-                        ):
-                            is_playing = False
-                            # Reset volume to default after fade-out
-                            if player.set_volume(DEFAULT_VOLUME):
-                                validate_response(
-                                    response,
-                                    f"Volume set to {DEFAULT_VOLUME}",
-                                    "Failed to set volume",
+                                sleep(0.3)
+                                log(
+                                    "DEBUG",
+                                    f"Volume faded to {vol}",
                                 )
+                        is_playing = False  # Mark playback as stopped
         else:  # In game mode
             secret_game.handle_game_mode()
 
-        sleep(0.3)  # Updated sleep to 0.3 seconds
+        sleep(0.3)
 except KeyboardInterrupt:
     log("WARN", "KeyboardInterrupt detected, exiting program")
-finally:
-    if player:
-        response = player.send_command(b"AT+STOP")
-        validate_response(
-            response,
-            "Program exited, playback stopped",
-            "Failed to send stop command",
-        )
