@@ -1,6 +1,6 @@
 from time import sleep
 from machine import Pin
-from dfplayerpro import DFPlayerPro, UART
+from dfplayerpro import DFPlayerPro
 from secretgame import SecretGame
 
 # Constants. Change these if DFPlayer is connected to other pins.

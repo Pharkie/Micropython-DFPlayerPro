@@ -1,5 +1,4 @@
 from time import sleep
-import random
 
 # Folder prefix for all file paths
 FOLDER_PREFIX = "/02/"
